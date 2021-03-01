@@ -19,18 +19,18 @@
                 placeholder="Например DOGE"
               />
             </div>
-            <!-- <div>
-              <ul class="overflow-hidden mt-1">
+            <div>
+              <ul if v-if="this.ticker" class="overflow-hidden mt-1 cursor-pointer">
                 <li
+                  @click="add(coin.symbol)"
                   v-for="coin in filteredCoins"
                   :key="coin.id"
-                  class="bg-gray-300 w-min mx-1 px-1 inline"
+                  class="bg-gray-300 `w-min mx-1 px-1 inline "
                 >
                   {{ coin.symbol }}
                 </li>
               </ul>
-            </div> -->
-            {{ filteredCoins }}
+            </div>
             <div class="text-red-400">Такой тикер уже добавлен</div>
           </div>
         </div>
@@ -39,7 +39,6 @@
           type="button"
           class="my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
         >
-          <!-- Heroicon name: solid/mail -->
           <svg
             class="-ml-0.5 mr-2 h-6 w-6"
             xmlns="http://www.w3.org/2000/svg"
@@ -56,27 +55,32 @@
         </button>
       </section>
       <template v-if="tickers.length">
-         <hr class="w-full border-t border-gray-600 my-4" />
-        <div> <button 
-          @click="page = page - 1" 
-          class=" my-4 mx-2 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-          v-if="page > 1"
+        <hr class="w-full border-t border-gray-600 my-4" />
+        <div>
+          <button
+            @click="page = page - 1"
+            class=" my-4 mx-2 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+            v-if="page > 1"
           >
-          Назад
-          </button> 
-         <button
-          @click="page = page + 1"
-          v-if="hasNextPage"
-           class="my-4 mx-2 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">Вперед</button>
-        <div> Фильтр: <input v-model="filter" /></div>  </div>
+            Назад
+          </button>
+          <button
+            @click="page = +page + 1"
+            v-if="hasNextPage"
+            class="my-4 mx-2 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+          >
+            Вперед
+          </button>
+          <div>Фильтр: <input v-model="filter" @input="page = 1" /></div>
+        </div>
         <hr class="w-full border-t border-gray-600 my-4" />
         <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
           <div
-            v-for="t in filteredTickers()"
+            v-for="t in paginatedTickers"
             :key="t.name"
             @click="select(t)"
             :class="{
-              'border-4': sel === t,
+              'border-4': selectedTicker === t,
             }"
             class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
           >
@@ -111,20 +115,20 @@
         </dl>
         <hr class="w-full border-t border-gray-600 my-4" />
       </template>
-      <section v-if="sel != null" class="relative">
+      <section v-if="selectedTicker != null" class="relative">
         <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
-          {{ sel.name }} - USD
+          {{ selectedTicker.name }} - USD
         </h3>
         <div class="flex items-end border-gray-600 border-b border-l h-64">
           <div
-            v-for="(bar, idx) in normalizeGraph()"
+            v-for="(bar, idx) in normalizedGraph"
             :key="idx"
             :style="{ height: `${bar}%` }"
             class="bg-purple-800 border w-10"
           ></div>
         </div>
         <button
-          @click="sel = null"
+          @click="selectedTicker = null"
           type="button"
           class="absolute top-0 right-0"
         >
@@ -160,117 +164,152 @@ export default {
   name: "App",
   data() {
     return {
-      ticker: '',
-      tickers: [],
-      allCoinList: [],
-      sel: null,
-      graph: [],
-      page: 1,
+      ticker: "",
       filter: "",
-      hasNextPage: true
+
+      tickers: [],
+      selectedTicker: null,
+
+      allCoinList: [],
+
+      graph: [],
+
+      page: 1,
     };
   },
   created() {
-    const windowData = Object.fromEntries(new URL(window.location).searchParams.entries())
-    
+    this.fetchAllCoin()
+    const windowData = Object.fromEntries(
+      new URL(window.location).searchParams.entries()
+    );
+
     if (windowData.filter) {
-      this.filter = windowData.filter
+      this.filter = windowData.filter;
     }
     if (windowData.page) {
-      this.page = windowData.page
+      this.page = windowData.page;
     }
+  // localStorage.clear()  // try to fix bug
+    const tickerData = localStorage.getItem("cryptonomicon-list");
     
-    const tickerData = localStorage.getItem('cryptonomicon-list')
     if (tickerData) {
-      this.tickers = JSON.parse(tickerData)
-      this.tickers.forEach(ticker => {
-        this.subscribesToUpdate(ticker.name)
-      })
+      this.tickers = JSON.parse(tickerData);
+      this.tickers.forEach((ticker) => {
+        this.subscribesToUpdate(ticker.name);
+      });
     }
   },
-
-  mounted() {
-    // this.fetchAllCoin();
-  },
+  mounted() {},
   methods: {
-    filteredTickers() {
-      const start = (this.page - 1)  * 6;
-      const end = this.page * 6;
-      const filteredTickers =this.tickers.filter(ticker => ticker.name.includes(this.filter))
-      this.hasNextPage = filteredTickers.length > end
-      return filteredTickers.slice(start ,end)
-    },
     subscribesToUpdate(tickerName) {
       setInterval(async () => {
         const f = await fetch(
           `https://min-api.cryptocompare.com/data/price?fsym=${tickerName}&tsyms=USD&api_key=377087d45447a91872a1cc2ad293c1f93b97521889b47b12ed3c795df79476a8`
         );
         const data = await f.json();
-          this.tickers.find((t) => t.name === tickerName).price =
+        this.tickers.find((t) => t.name === tickerName).price =
           data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
-        if (this.sel?.name === tickerName) {
+        if (this.selectedTicker?.name === tickerName) {
           this.graph.push(data.USD);
         }
       }, 5000);
     },
-    add() {
+    add(symbol) {
       const newTicker = {
-        name: this.ticker,
+        name: symbol,
         price: "-",
       };
-      this.tickers.push(newTicker);
-      this.filter = ''
-      localStorage.setItem('cryptonomicon-list', JSON.stringify(this.tickers))
-      this.subscribesToUpdate(newTicker.name)
+      this.tickers = [...this.tickers, newTicker]
+      this.filter = "";
+      this.subscribesToUpdate(newTicker.name);
       this.ticker = "";
     },
     handleDelete(tickerToRemove) {
       this.tickers = this.tickers.filter((t) => t != tickerToRemove);
-
+      if(this.selectedTicker === tickerToRemove) {
+        this.selectedTicker =  null
+      }
     },
-    normalizeGraph() {
+    select(ticker) {
+      this.selectedTicker = ticker;
+    },
+    async fetchAllCoin() {
+      const apiKey =
+        "377087d45447a91872a1cc2ad293c1f93b97521889b47b12ed3c795df79476a8";
+      const f = await fetch(
+        `https://min-api.cryptocompare.com/data/blockchain/list?api_key=${apiKey}`
+      );
+      const allCoin = await f.json();
+      this.allCoinList = Object.values(allCoin.Data);
+    },
+  },
+  
+  computed: {
+    startIndex() {
+      return (this.page - 1) * 6
+    },
+    endIndex () {
+      return this.page * 6;
+    },
+    filteredCoins() {
+      let awto = []
+      if (this.allCoinList) {
+        awto = this.allCoinList.filter((coin) =>
+        coin.symbol.includes(this.ticker.toUpperCase()))
+      } 
+      return awto ? awto : [];
+    },
+      filteredTickers() {
+     return  this.tickers.filter((ticker) =>
+        ticker.name.includes(this.filter.toUpperCase()))
+      },
+      paginatedTickers () {
+        return this.filteredTickers.slice(this.startIndex, this.endIndex);
+      },
+    hasNextPage() {
+      return this.filteredTickers.length > this.endIndex
+    },
+    normalizedGraph() {
       const maxValue = Math.max(...this.graph);
       const minValue = Math.min(...this.graph);
+      if (maxValue === minValue) {
+        return this.graph.map(() => 50)
+      }
       return this.graph.map(
         (price) => 5 + ((price - minValue) * 95) / (maxValue - minValue)
       );
     },
-    select(ticker) {
-      this.sel = ticker;
-      this.graph = [];
-    },
-    // async fetchAllCoin() {
-    //   const apiKey =
-    //     "377087d45447a91872a1cc2ad293c1f93b97521889b47b12ed3c795df79476a8";
-    //   const f = await fetch(
-    //     `https://min-api.cryptocompare.com/data/blockchain/list?api_key=${apiKey}`
-    //   );
-    //   const allCoin = await f.json();
-    //   this.allCoinList = Object.values(allCoin.Data);
-    // },
-  },
-
-  computed: {
-    filteredCoins() {
-      let arrayFilt = [];
-      this.allCoinList.filter(coin => {
-      let arr = coin.symbol.split("") 
-       if(arr.includes(this.ticker.split(""))) {
-         arrayFilt.push(coin.symbol)
-       }
-      })
-      return arrayFilt
-    },
+    pagestateOption() {
+      return  {
+        filter: this.filter,
+        page:  this.page
+      }
+    }
   },
   watch: {
-    filter() {
-      this.page = 1
-      window.history.pushState(null , document.title, `${window.location.pathname}?filter=${this.filter}&page=${this.page}`)
+    tickers(newValue, oldValue) {
+      console.log(newValue === oldValue);
+      localStorage.setItem('cryptonomicon-list' , JSON.stringify(this.tickers))
     },
-    page() {
-       window.history.pushState(null , document.title, `${window.location.pathname}?filter=${this.filter}&page=${this.page}`)
-    }
-  }
+    selectedTicker() {
+      this.graph = []
+    },
+    paginatedTickers() {
+      if (this.paginatedTickers.length === 0 && this.page > 1) {
+        this.page -=1
+      }
+    },
+    filter() {
+     this.page = 1
+    },
+    pagestateOption(v) {
+      window.history.pushState(
+        null,
+        document.title,
+        `${window.location.pathname}?filter=${v.filter}&page=${v.page}`
+      );
+    },
+  },
 };
 </script>
 
