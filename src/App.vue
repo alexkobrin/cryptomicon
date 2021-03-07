@@ -252,12 +252,8 @@ export default {
       return this.page * 6;
     },
     filteredCoins() {
-      let awto = []
-      if (this.allCoinList) {
-        awto = this.allCoinList.filter((coin) =>
-        coin.symbol.includes(this.ticker.toUpperCase()))
-      } 
-      return awto ? awto : [];
+        return   this.allCoinList.filter((coin) =>
+        coin.symbol.includes(this.ticker.toUpperCase())) 
     },
       filteredTickers() {
      return  this.tickers.filter((ticker) =>
