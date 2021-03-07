@@ -160,6 +160,9 @@
 </template>
 
 <script>
+
+import { loadTicker }  from './api';
+
 export default {
   name: "App",
   data() {
@@ -178,7 +181,7 @@ export default {
     };
   },
   created() {
-    this.fetchAllCoin()
+  //  this.fetchAllCoin()
     const windowData = Object.fromEntries(
       new URL(window.location).searchParams.entries()
     );
@@ -189,39 +192,33 @@ export default {
     if (windowData.page) {
       this.page = windowData.page;
     }
-  // localStorage.clear()  // try to fix bug
+ //  localStorage.clear()  // try to fix bug
     const tickerData = localStorage.getItem("cryptonomicon-list");
     
     if (tickerData) {
       this.tickers = JSON.parse(tickerData);
-      this.tickers.forEach((ticker) => {
-        this.subscribesToUpdate(ticker.name);
-      });
     }
+    setInterval(this.updateTickers, 5000)
   },
   mounted() {},
   methods: {
-    subscribesToUpdate(tickerName) {
-      setInterval(async () => {
-        const f = await fetch(
-          `https://min-api.cryptocompare.com/data/price?fsym=${tickerName}&tsyms=USD&api_key=377087d45447a91872a1cc2ad293c1f93b97521889b47b12ed3c795df79476a8`
-        );
-        const data = await f.json();
-        this.tickers.find((t) => t.name === tickerName).price =
-          data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
-        if (this.selectedTicker?.name === tickerName) {
-          this.graph.push(data.USD);
-        }
-      }, 5000);
+   async updateTickers() {
+     if (!this.tickers.length) {
+       return 
+     }
+      const exchange =  await loadTicker(this.tickers.map(t => t.name)) 
+      this.tickers.forEach(ticker => {
+      const price = exchange[ticker.name.toUpperCase()]
+      ticker.price = price ?  (1 / price) : '-'
+       })
     },
-    add(symbol) {
+    add() {
       const newTicker = {
-        name: symbol,
+        name: this.ticker,
         price: "-",
       };
       this.tickers = [...this.tickers, newTicker]
       this.filter = "";
-      this.subscribesToUpdate(newTicker.name);
       this.ticker = "";
     },
     handleDelete(tickerToRemove) {
@@ -255,9 +252,9 @@ export default {
         return   this.allCoinList.filter((coin) =>
         coin.symbol.includes(this.ticker.toUpperCase())) 
     },
-      filteredTickers() {
-     return  this.tickers.filter((ticker) =>
-        ticker.name.includes(this.filter.toUpperCase()))
+    filteredTickers() {
+     return this.tickers.filter(ticker =>
+        ticker.name.includes(this.filter))
       },
       paginatedTickers () {
         return this.filteredTickers.slice(this.startIndex, this.endIndex);
