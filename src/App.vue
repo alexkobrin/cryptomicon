@@ -86,10 +86,10 @@
           >
             <div class="px-4 py-5 sm:p-6 text-center">
               <dt class="text-sm font-medium text-gray-500 truncate">
-                {{ t.name }} - USD
+                {{ t.name.toUpperCase() }} - USD
               </dt>
               <dd class="mt-1 text-3xl font-semibold text-gray-900">
-                {{ t.price }}
+                {{ formatPrice(t.price) }}
               </dd>
             </div>
             <div class="w-full border-t border-gray-200"></div>
@@ -161,7 +161,7 @@
 
 <script>
 
-import { loadTicker }  from './api';
+import { subscribeToTicker, unsubscribeFromTicker }  from './api';
 
 export default {
   name: "App",
@@ -192,40 +192,54 @@ export default {
     if (windowData.page) {
       this.page = windowData.page;
     }
- //  localStorage.clear()  // try to fix bug
     const tickerData = localStorage.getItem("cryptonomicon-list");
-    
     if (tickerData) {
       this.tickers = JSON.parse(tickerData);
+      this.tickers.forEach(ticker => {
+        subscribeToTicker(ticker.name, (newPrice) => this.updateTickers(ticker.name, newPrice))
+      })
     }
     setInterval(this.updateTickers, 5000)
   },
   mounted() {},
   methods: {
-   async updateTickers() {
-     if (!this.tickers.length) {
-       return 
-     }
-      const exchange =  await loadTicker(this.tickers.map(t => t.name)) 
-      this.tickers.forEach(ticker => {
-      const price = exchange[ticker.name.toUpperCase()]
-      ticker.price = price ?  (1 / price) : '-'
-       })
+      updateTicker(tickerName , price) {
+      this.tickers
+      .filter(t => t.name === tickerName)
+      .forEach(t => {t.price = price})
     },
+    formatPrice(price) {
+      if (price === "-") {
+        return price
+      }
+      return  price > 1 ? price.toFixed(2) : price.toPrecision(2)
+    },
+  //  async updateTickers() {
+  //    if (!this.tickers.length) {
+  //      return 
+  //    }
+  //     //const exchange =  await loadTickers(this.tickers.map(t => t.name)) 
+  //     this.tickers.forEach(ticker => {
+  //     const price = exchange[ticker.name.toUpperCase()]
+  //     ticker.price =  price ?? "-"
+  //    })
+  //   },
     add() {
-      const newTicker = {
-        name: this.ticker,
+      const currentTicker = {
+        name: this.ticker.toUpperCase(),
         price: "-",
       };
-      this.tickers = [...this.tickers, newTicker]
-      this.filter = "";
+      this.tickers = [...this.tickers, currentTicker]
       this.ticker = "";
+      this.filter = "";
+      subscribeToTicker(currentTicker.name, (newPrice) => this.updateTicker(currentTicker.name, newPrice));
     },
     handleDelete(tickerToRemove) {
       this.tickers = this.tickers.filter((t) => t != tickerToRemove);
       if(this.selectedTicker === tickerToRemove) {
         this.selectedTicker =  null
       }
+      unsubscribeFromTicker(tickerToRemove.name)
     },
     select(ticker) {
       this.selectedTicker = ticker;
