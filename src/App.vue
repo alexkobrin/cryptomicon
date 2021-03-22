@@ -196,23 +196,27 @@ export default {
     if (tickerData) {
       this.tickers = JSON.parse(tickerData);
       this.tickers.forEach(ticker => {
-        subscribeToTicker(ticker.name, (newPrice) => this.updateTickers(ticker.name, newPrice))
+        subscribeToTicker(ticker.name, (newPrice) => this.updateTicker(ticker.name, newPrice))
       })
     }
-    setInterval(this.updateTickers, 5000)
+    setInterval(this.updateTicker, 5000)
   },
   mounted() {},
   methods: {
       updateTicker(tickerName , price) {
       this.tickers
       .filter(t => t.name === tickerName)
-      .forEach(t => {t.price = price})
+      .forEach(t => {
+        if (t === this.selectedTicker) {
+          this.graph.push(price)
+        }
+        t.price = price})
     },
     formatPrice(price) {
       if (price === "-") {
         return price
       }
-      return  price > 1 ? price.toFixed(2) : price.toPrecision(2)
+      return  price > 1 ? price.toFixed(2) : price.toPrecision(3)
     },
   //  async updateTickers() {
   //    if (!this.tickers.length) {
